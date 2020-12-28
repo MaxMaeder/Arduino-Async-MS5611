@@ -1,10 +1,4 @@
 /*
-MS5611.cpp - Class file for the MS5611 Barometric Pressure & Temperature Sensor Arduino Library.
-
-Version: 1.0.0
-(c) 2014 Korneliusz Jarzebski
-www.jarzebski.pl
-
 This program is free software: you can redistribute it and/or modify
 it under the terms of the version 3 GNU General Public License as
 published by the Free Software Foundation.
@@ -96,8 +90,10 @@ void MS5611::readPROM(void)
     }
 }
 
-uint32_t MS5611::readRawTemperature(void)
+bool MS5611::requestTemperature(void)
 {
+    if (measurementDone != 0) return false;
+
     Wire.beginTransmission(MS5611_ADDRESS);
 
     #if ARDUINO >= 100
@@ -108,13 +104,16 @@ uint32_t MS5611::readRawTemperature(void)
 
     Wire.endTransmission();
 
-    delay(ct);
+    measurementType = TEMP;
+    measurementDone = millis() + ct;
 
-    return readRegister24(MS5611_CMD_ADC_READ);
+    return true;
 }
 
-uint32_t MS5611::readRawPressure(void)
+bool MS5611::requestPressure(void)
 {
+    if (measurementDone != 0) return false;
+
     Wire.beginTransmission(MS5611_ADDRESS);
 
     #if ARDUINO >= 100
@@ -125,69 +124,63 @@ uint32_t MS5611::readRawPressure(void)
 
     Wire.endTransmission();
 
-    delay(ct);
+    measurementType = PRESSURE;
+    measurementDone = millis() + ct;
+
+    return true;
+}
+
+bool MS5611::temperatureReady(void)
+{
+    return measurementDone != 0 && measurementType == TEMP && millis() > measurementDone;
+}
+
+bool MS5611::pressureReady(void)
+{
+    return measurementDone != 0 && measurementType == PRESSURE && millis() > measurementDone;
+}
+
+uint32_t MS5611::readRawTemperature(void)
+{
+    if (!temperatureReady()) return 0;
+
+    measurementDone = 0;
 
     return readRegister24(MS5611_CMD_ADC_READ);
 }
 
-int32_t MS5611::readPressure(bool compensation)
+uint32_t MS5611::readRawPressure(void)
 {
-    uint32_t D1 = readRawPressure();
+    if (!pressureReady()) return 0;
 
-    uint32_t D2 = readRawTemperature();
-    int32_t dT = D2 - (uint32_t)fc[4] * 256;
+    measurementDone = 0;
 
-    int64_t OFF = (int64_t)fc[1] * 65536 + (int64_t)fc[3] * dT / 128;
-    int64_t SENS = (int64_t)fc[0] * 32768 + (int64_t)fc[2] * dT / 256;
-
-    if (compensation)
-    {
-	int32_t TEMP = 2000 + ((int64_t) dT * fc[5]) / 8388608;
-
-	OFF2 = 0;
-	SENS2 = 0;
-
-	if (TEMP < 2000)
-	{
-	    OFF2 = 5 * ((TEMP - 2000) * (TEMP - 2000)) / 2;
-	    SENS2 = 5 * ((TEMP - 2000) * (TEMP - 2000)) / 4;
-	}
-
-	if (TEMP < -1500)
-	{
-	    OFF2 = OFF2 + 7 * ((TEMP + 1500) * (TEMP + 1500));
-	    SENS2 = SENS2 + 11 * ((TEMP + 1500) * (TEMP + 1500)) / 2;
-	}
-
-	OFF = OFF - OFF2;
-	SENS = SENS - SENS2;
-    }
-
-    uint32_t P = (D1 * SENS / 2097152 - OFF) / 32768;
-
-    return P;
+    return readRegister24(MS5611_CMD_ADC_READ);
 }
 
-double MS5611::readTemperature(bool compensation)
+double MS5611::adjustTemperature(uint32_t temperature)
 {
-    uint32_t D2 = readRawTemperature();
-    int32_t dT = D2 - (uint32_t)fc[4] * 256;
+    int32_t dT = temperature - (uint32_t)fc[4] * 256;
 
     int32_t TEMP = 2000 + ((int64_t) dT * fc[5]) / 8388608;
 
     TEMP2 = 0;
 
-    if (compensation)
-    {
-	if (TEMP < 2000)
-	{
-	    TEMP2 = (dT * dT) / (2 << 30);
-	}
-    }
-
     TEMP = TEMP - TEMP2;
 
     return ((double)TEMP/100);
+}
+
+int32_t MS5611::adjustPressure(uint32_t pressure, uint32_t temperature)
+{
+    int32_t dT = temperature - (uint32_t)fc[4] * 256;
+
+    int64_t OFF = (int64_t)fc[1] * 65536 + (int64_t)fc[3] * dT / 128;
+    int64_t SENS = (int64_t)fc[0] * 32768 + (int64_t)fc[2] * dT / 256;
+
+    uint32_t P = (pressure * SENS / 2097152 - OFF) / 32768;
+
+    return P;
 }
 
 // Calculate altitude from Pressure & Sea level pressure
@@ -214,9 +207,9 @@ uint16_t MS5611::readRegister16(uint8_t reg)
     #endif
     Wire.endTransmission();
 
-    Wire.beginTransmission(MS5611_ADDRESS);
+    //Wire.beginTransmission(MS5611_ADDRESS);
     Wire.requestFrom(MS5611_ADDRESS, 2);
-    while(!Wire.available()) {};
+    //while(!Wire.available()) {};
     #if ARDUINO >= 100
         uint8_t vha = Wire.read();
         uint8_t vla = Wire.read();
@@ -224,7 +217,7 @@ uint16_t MS5611::readRegister16(uint8_t reg)
         uint8_t vha = Wire.receive();
         uint8_t vla = Wire.receive();
     #endif;
-    Wire.endTransmission();
+    //Wire.endTransmission();
 
     value = vha << 8 | vla;
 
@@ -243,9 +236,9 @@ uint32_t MS5611::readRegister24(uint8_t reg)
     #endif
     Wire.endTransmission();
 
-    Wire.beginTransmission(MS5611_ADDRESS);
+    //Wire.beginTransmission(MS5611_ADDRESS);
     Wire.requestFrom(MS5611_ADDRESS, 3);
-    while(!Wire.available()) {};
+    //while(!Wire.available()) {};
     #if ARDUINO >= 100
         uint8_t vxa = Wire.read();
         uint8_t vha = Wire.read();
@@ -255,7 +248,7 @@ uint32_t MS5611::readRegister24(uint8_t reg)
         uint8_t vha = Wire.receive();
         uint8_t vla = Wire.receive();
     #endif;
-    Wire.endTransmission();
+    //Wire.endTransmission();
 
     value = ((int32_t)vxa << 16) | ((int32_t)vha << 8) | vla;
 

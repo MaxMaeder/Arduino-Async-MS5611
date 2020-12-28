@@ -1,10 +1,4 @@
 /*
-MS5611.h - Header file for the MS5611 Barometric Pressure & Temperature Sensor Arduino Library.
-
-Version: 1.0.0
-(c) 2014 Korneliusz Jarzebski
-www.jarzebski.pl
-
 This program is free software: you can redistribute it and/or modify
 it under the terms of the version 3 GNU General Public License as
 published by the Free Software Foundation.
@@ -47,30 +41,40 @@ typedef enum
 class MS5611
 {
     public:
-
-	bool begin(ms5611_osr_t osr = MS5611_HIGH_RES);
-	uint32_t readRawTemperature(void);
-	uint32_t readRawPressure(void);
-	double readTemperature(bool compensation = false);
-	int32_t readPressure(bool compensation = false);
-	double getAltitude(double pressure, double seaLevelPressure = 101325);
-	double getSeaLevel(double pressure, double altitude);
-	void setOversampling(ms5611_osr_t osr);
-	ms5611_osr_t getOversampling(void);
+        bool begin(ms5611_osr_t osr = MS5611_HIGH_RES);
+        bool requestTemperature(void);
+        bool requestPressure(void);
+        bool temperatureReady(void);
+        bool pressureReady(void);
+        uint32_t readRawTemperature(void);
+        uint32_t readRawPressure(void);
+        double adjustTemperature(uint32_t temperature);
+        int32_t adjustPressure(uint32_t pressure, uint32_t temperature);
+        double getAltitude(double pressure, double seaLevelPressure = 101325);
+        double getSeaLevel(double pressure, double altitude);
+        void setOversampling(ms5611_osr_t osr);
+        ms5611_osr_t getOversampling(void);
 
     private:
+        enum MeasurementType {
+            TEMP,
+            PRESSURE
+        };
 
-	uint16_t fc[6];
-	uint8_t ct;
-	uint8_t uosr;
-	int32_t TEMP2;
-	int64_t OFF2, SENS2;
+        uint16_t fc[6];
+        uint8_t ct;
+        uint8_t uosr;
+        int32_t TEMP2;
+        int64_t OFF2, SENS2;
 
-	void reset(void);
-	void readPROM(void);
+        MeasurementType measurementType;
+        uint32_t measurementDone;
 
-	uint16_t readRegister16(uint8_t reg);
-	uint32_t readRegister24(uint8_t reg);
+        void reset(void);
+        void readPROM(void);
+
+        uint16_t readRegister16(uint8_t reg);
+        uint32_t readRegister24(uint8_t reg);
 };
 
 #endif
