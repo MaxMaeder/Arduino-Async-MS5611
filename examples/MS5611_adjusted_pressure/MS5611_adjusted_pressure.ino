@@ -22,8 +22,8 @@ void setup()
   Serial.print("Oversampling: ");
   Serial.println(ms5611.getOversampling());
 
-  // Start the first pressure reading
-  ms5611.requestPressure();
+  // Start the first temperature reading
+  ms5611.readRawTemperature();
 }
 
 void loop()
