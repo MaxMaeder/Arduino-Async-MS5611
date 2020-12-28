@@ -33,7 +33,7 @@ These functions return a `true` or `false` value.
 
 Use `readRawTemperature()` or `readRawPressure()` to read the temperature, in Celsius, or pressure, in Pascals, after the measurement is ready. 
 
-These measurements aren't adjusted using calibration data from the factory, and the temperature is not compensated for in the pressure reading. This was done to make the library as preformat as possible for users who do not need this feature.
+These measurements aren't adjusted using calibration data from the factory, and the temperature is not compensated for in the pressure reading. This was done to make the library as preformant as possible for users who do not need this feature.
 
 If you do want to adjust the temperature value using the calibration data, which is recommended, pass the output of `readRawTemperature()` to `adjustTemperature()`.
 
